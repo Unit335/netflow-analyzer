@@ -1,0 +1,6 @@
+Package: netflow-analyzer
+Version: 1.0.0
+Architecture: amd64
+Maintainer: Ilya DUbovskii <idubovskii@outlook.com>
+Description: Netflow Exporter realisation in C
+
