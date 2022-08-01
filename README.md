@@ -23,7 +23,7 @@
 
 В утилите используется следующий синтакси опций запуска, для работы необходимо указать сетевой интерфейс для работы и адрес + порт коллектора.
 ```
-udp-stat [ --interface INTERFACE-dest DESTINATION_IP --dest_port DESTINATION_PORT ]
+netflow-analyzer [ --interface INTERFACE-dest DESTINATION_IP --dest_port DESTINATION_PORT ]
 interface: название сетевого интерфейса на котором необходимо отслеживать пакеты
 dest: IP адрес коллектора в формате XXX.XXX.XXX.XXX 
 dest_port: порт коллектора
