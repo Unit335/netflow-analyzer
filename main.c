@@ -47,22 +47,33 @@ void *packet_parser()
     unsigned char *buffer = (unsigned char *) malloc(PACKET_SIZE);
     pthread_cleanup_push(free, buffer) ;
 
-    sock_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+    sock_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_IP));
     if (sock_raw < 0) {
-        perror("Socket Error\n");
+        perror("Socket Error: ");
         pthread_exit((void *) 1);
     }
     pthread_cleanup_push(socket_close, NULL) ;
 
     if (interface[0] != '\0') {
         struct ifreq ifr;
+        struct sockaddr_ll addr;
+        strncpy(ifr.ifr_name,interface,IFNAMSIZ);
+        if ( ioctl(sock_raw,SIOCGIFINDEX,&ifr) == -1) {
+            perror("Interface index not found: ");
+        }
+
+        addr.sll_family = AF_PACKET;
+        addr.sll_protocol = htons(ETH_P_IP);
+        addr.sll_ifindex = ifr.ifr_ifindex;
+        bind(sock_raw, (const struct sockaddr *)(&addr), sizeof(addr));
+/*
         setsockopt(sock_raw, SOL_SOCKET, SO_BINDTODEVICE, "", 0);
         memset(&ifr, 0, sizeof(ifr));
         snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), interface);
         if (setsockopt(sock_raw, SOL_SOCKET, SO_BINDTODEVICE, (void *) &ifr, sizeof(ifr)) == -1) {
             perror("Failure to bind socket to interface");
             pthread_exit((void *) 1);
-        }
+        }*/
     }
 
     saddr_size = sizeof saddr;

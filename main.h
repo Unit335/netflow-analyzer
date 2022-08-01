@@ -24,6 +24,7 @@
 #include <netinet/in.h>
 #include <time.h>
 #include <sys/sysinfo.h>
+#include <sys/ioctl.h>
 #include "uthash.h"
 
 #define PACKET_SIZE 65536 //maximum packet size
@@ -43,25 +44,17 @@
 pthread_t sock_read, stat, check;
 pthread_mutex_t lock;
 
-void closing_handler();
-
 _Bool run_switch = 1;
 
+void closing_handler();
 int parse_cmdline(int argc, char *argv[]);
-
 void socket_close();
-
 unsigned int c_time();
-
 void *packet_parser();
-
 void flow_identifier();
-
 void *flow_check();
 
-
 int sock_raw;
-_Bool snd_switch = 0;
 int data_size;
 uint8_t flag;
 
