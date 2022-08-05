@@ -40,19 +40,36 @@ Starting
 ## Пропускная способность
 
 Пропускная способность тестировалась с помощью tcpreplay и nfcapd в качестве коллектора из пакета nfdump. Для тестового набора пакетов был взят smallFlows https://tcpreplay.appneta.com/wiki/captures.html#smallflows-pcap
-В данном датасете 14261 пакетов и 1209 потоков. Оптимальной нагрузкой работы было 4 Mbps.
+В данном датасете 14261 пакетов и 1209 потоков.
+
+Тест на скорости 500 Mbps с 30ю повторениями набора.
+
+TCPReplay:
 ```
-Flows: 1212, Packets: 45420, Bytes: 8216531, Sequence Errors: 0, Bad Packets: 0
+$ sudo tcpreplay -i lo -l 30 -M 500  smallFlows.pcap 
+Warning in sendpacket.c:sendpacket_open_pf() line 942:
+Unsupported physical layer type 0x0304 on lo.  Maybe it works, maybe it won't.  See tickets #123/318
+Actual: 427830 packets (276495930 bytes) sent in 4.42 seconds
+Rated: 62496621.9 Bps, 499.97 Mbps, 96702.79 pps
+Flows: 1209 flows, 273.27 fps, 12818700 flow packets, 16200 non-flow
+Statistics for network device: lo
+	Successful packets:        427830
+	Failed packets:            0
+	Truncated packets:         0
+	Retried packets (ENOBUFS): 0
+	Retried packets (EAGAIN):  0
+```
+
+Вывод nfcapd:
+```
+Process_v9: New exporter: SysID: 1, Domain: 1, IP: 127.0.0.1
+Process_v9: [1] Add template 256
+Ident: 'none' Flows: 1209, Packets: 425492, Bytes: 275001075, Sequence Errors: 0, Bad Packets: 0
 Total ignored packets: 0
-Flows: 2, Packets: 2012, Bytes: 122112, Sequence Errors: 0, Bad Packets: 0
+Ident: 'none' Flows: 1, Packets: 1209, Bytes: 161872, Sequence Errors: 0, Bad Packets: 0
 Total ignored packets: 0
 ```
 
-Для датасета bigFlows (791615 пакетов и 40686 потоков). При скорости ~5.5 Mbps.
-```
-Flows: 22002, Packets: 217587, Bytes: 89201433, Sequence Errors: 165, Bad Packets: 0
-Total ignored packets: 0
-Flows: 17788, Packets: 552923, Bytes: 198130198, Sequence Errors: 297, Bad Packets: 0
-Total ignored packets: 0
-```
-Суммарно потеряно ~2.3% пакетов и ~2.3% потоков.
+Потеряно 0.546% пакетов.
+При дальнейшем тестировании (с аналогичным повторением набора данных 30 раз) на скорости 80 Mbps удалось достичь отсутствия потерь, с ~100 Mbps они составляли ~0.46%, на 650 уже ~0.9%.
+На максимальной скорости - 2031.98 Mbps - потеря пакетов составила ~17%.
