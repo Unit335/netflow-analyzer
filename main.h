@@ -41,7 +41,7 @@
 #define FLOWSET_ID 256
 #define INTERFACE_LENGTH 6 //maximum interface length for sending Data Flow packet
 
-pthread_t sock_read, stat, check;
+pthread_t sock_read, check;
 pthread_mutex_t lock;
 
 _Bool run_switch = 1;
@@ -56,7 +56,6 @@ void *flow_check();
 
 int sock_raw;
 int data_size;
-uint8_t flag;
 
 struct sockaddr_in fdest;
 char interface[16];
@@ -66,8 +65,8 @@ struct sockaddr_in source, dest;
 typedef struct uniq_flow_data {
     struct sockaddr_in source;
     struct sockaddr_in dest;
-    int16_t source_port;
-    int16_t dest_port;
+    uint16_t source_port;
+    uint16_t dest_port;
 
     uint8_t protocol;
     uint8_t tos;
@@ -114,23 +113,23 @@ int total_exported = 0;
 
 #pragma pack(push, 1)
 struct nf_header {
-    int16_t version;
-    int16_t count;
+    uint16_t version;
+    uint16_t count;
     uint32_t uptime;
     uint32_t epoch_time;
     uint32_t pack_sequence;
     uint32_t source_id;
 };
 
-void flow_export(flow_data_casing *flow, struct nf_header header, char *buffer, int packet_size);
+void flow_export(flow_data_casing *flow, struct nf_header header, char *buffer);
 
 struct flowset {
-    int16_t flowset_id;
-    int16_t length;
-    int16_t template_id;
-    int16_t field_count;
+    uint16_t flowset_id;
+    uint16_t length;
+    uint16_t template_id;
+    uint16_t field_count;
 
-    int16_t fields[40];
+    uint16_t fields[40];
 };
 
 typedef struct packet_template {
@@ -142,7 +141,7 @@ typedef struct packet_template {
     uint8_t PROTOCOL;
     uint8_t SRC_TOS;
     uint8_t TCP_FLAGS;
-    int16_t L4_SRC_PORT;
+    uint16_t L4_SRC_PORT;
     uint32_t IPV4_SRC_ADDR;
     uint32_t INPUT_SNMP;
     uint16_t L4_DST_PORT;

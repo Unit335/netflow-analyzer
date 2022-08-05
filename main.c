@@ -1,7 +1,5 @@
 #include "main.h"
 
-uniq_flow_data uniq_flow;
-
 void closing_handler() 
 {
     printf("\nClosing...\n");
@@ -29,13 +27,12 @@ int main(int argc, char *argv[])
     }
 
 
-    int main_retcode = 0;
-    void *socket_retcode;
+    void *socket_retcode, *flowcheck_retcode;
     pthread_join(sock_read, &socket_retcode);
-    pthread_join(check, NULL);
-    if ((intptr_t) socket_retcode == 1)
-        main_retcode = 1;
-    return main_retcode;
+    pthread_join(check, &flowcheck_retcode);
+    if ((intptr_t) socket_retcode == 1 || (intptr_t) flowcheck_retcode == 1)
+        return 1;
+    return 0;
 
 }
 
@@ -47,7 +44,7 @@ void *packet_parser()
     unsigned char *buffer = (unsigned char *) malloc(PACKET_SIZE);
     pthread_cleanup_push(free, buffer) ;
 
-    sock_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_IP));
+    sock_raw = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (sock_raw < 0) {
         perror("Socket Error: ");
         pthread_exit((void *) 1);
@@ -66,14 +63,7 @@ void *packet_parser()
         addr.sll_protocol = htons(ETH_P_IP);
         addr.sll_ifindex = ifr.ifr_ifindex;
         bind(sock_raw, (const struct sockaddr *)(&addr), sizeof(addr));
-/*
-        setsockopt(sock_raw, SOL_SOCKET, SO_BINDTODEVICE, "", 0);
-        memset(&ifr, 0, sizeof(ifr));
-        snprintf(ifr.ifr_name, sizeof(ifr.ifr_name), interface);
-        if (setsockopt(sock_raw, SOL_SOCKET, SO_BINDTODEVICE, (void *) &ifr, sizeof(ifr)) == -1) {
-            perror("Failure to bind socket to interface");
-            pthread_exit((void *) 1);
-        }*/
+
     }
 
     saddr_size = sizeof saddr;
@@ -85,10 +75,6 @@ void *packet_parser()
         memset(casings[i], 0, sizeof(flow_data_casing));
     }
     while (!(init_1));
-
-    clock_t start, end;
-    double cpu_time_used;
-
 
     while (run_switch) {
         data_size = recvfrom(sock_raw, buffer, PACKET_SIZE, 0, &saddr,
@@ -119,6 +105,7 @@ void *packet_parser()
             memcpy(casings[cur_el]->in_src_mac, eth->h_source, 6);
             memcpy(casings[cur_el]->in_dst_mac, eth->h_source, 6);
             casings[cur_el]->id = iph->id;
+            flow_identifier();
         }
         else if (iph->protocol == 6) { //TCP
             unsigned short iphdrlen = iph->ihl * 4;
@@ -139,6 +126,7 @@ void *packet_parser()
             memcpy(casings[cur_el]->in_src_mac, eth->h_source, 6);
             memcpy(casings[cur_el]->in_dst_mac, eth->h_source, 6);
             casings[cur_el]->id = iph->id;
+            flow_identifier();
         }
         else if (iph->protocol == 1) { //ICMP
             unsigned short iphdrlen = iph->ihl * 4;
@@ -159,8 +147,8 @@ void *packet_parser()
             memcpy(casings[cur_el]->in_src_mac, eth->h_source, 6);
             memcpy(casings[cur_el]->in_dst_mac, eth->h_source, 6);
             casings[cur_el]->id = iph->id;
+            flow_identifier();
         }
-        flow_identifier();
     }
 
     pthread_cleanup_pop(1);
@@ -172,13 +160,14 @@ void *packet_parser()
 //creates and updates flows
 void flow_identifier() 
 {
+ //   printf("%d\n", flow_count);
     flow_data_casing *p;
     HASH_FIND(hh, r, &(casings[cur_el]->flow_key), sizeof(uniq_flow_data), p);
     if (p != NULL) {
         pthread_mutex_lock(&lock);
         p->last_switch = c_time();
         p->data_size += data_size;
-        ++p->packet_counter;
+        p->packet_counter += 1;
         p->flags = casings[cur_el]->flags || p->flags;
         pthread_mutex_unlock(&lock);
     } else {
@@ -188,6 +177,7 @@ void flow_identifier()
         casings[cur_el]->packet_counter = 1;
 
         HASH_ADD(hh, r, flow_key, sizeof(uniq_flow_data), casings[cur_el]);
+        //memset(&casings[cur_el], 0, sizeof(flow_data_casing));
         ++cur_el;
         ++flow_count;
 
@@ -275,48 +265,49 @@ void *flow_check()
     while (run_switch) {
         flow_data_casing *p, *tmp;
         HASH_ITER(hh, r, p, tmp) {
-
             if (c_time() - p->last_switch >= FLOW_EXPIRY_INTERVAL) {
                 pthread_mutex_lock(&lock);
                 ++total_exported;
-                flow_export(p, header, buffer, buffer_size);
+                flow_export(p, header, buffer);
                 if (sendto(export_socket, &buffer, buffer_size, 0, (struct sockaddr *) &fdest, sizeof(fdest)) < 0) {
                     perror("Export on expiration error: ");
                 }
+                memset(&buffer, 0, buffer_size);
                 HASH_DEL(r, p);
                 --flow_count;
                 pthread_mutex_unlock(&lock);
             } else if (time(NULL) - p->last_export >= FLOW_EXPORT_INTERVAL) {
                 pthread_mutex_lock(&lock);
                 ++total_exported;
-                flow_export(p, header, buffer, buffer_size);
+                flow_export(p, header, buffer);
                 if (sendto(export_socket, &buffer, buffer_size, 0, (struct sockaddr *) &fdest, sizeof(fdest)) < 0) {
                     perror("Export error: ");
                 } else p->last_export = time(NULL);
+                memset(&buffer, 0, buffer_size);
                 pthread_mutex_unlock(&lock);
             }
         }
         if ( ( FLOWSET_EXPORT == 1 && time(NULL) - flowset_export >= FLOWSET_EXPORT_INTERVAL )
             || ( FLOWSET_EXPORT == 0 && total_exported - flowset_export >= FLOWSET_EXPORT_PACKET ) ) {
+            ++total_exported;
             header.pack_sequence = htonl(total_exported);
             header.uptime = htonl((unsigned int) c_time());
             header.epoch_time = htonl(time(NULL));
-            ++total_exported;
             memcpy(tbuffer, &header, sizeof(header));
             if (sendto(export_socket, &tbuffer, sizeof(tbuffer), 0, (struct sockaddr *) &fdest, sizeof(fdest)) < 0) {
                 perror("Data Flow set update error: ");
             } else flowset_export = time(NULL);
-            flowset_export = total_exported;
         }
 
     }
 
     close(export_socket);
+    pthread_exit((void *) 0);
 }
 
-void flow_export(flow_data_casing *flow, struct nf_header header, char *buffer, int packet_size)
+void flow_export(flow_data_casing *flow, struct nf_header header, char *buffer)
 {
-    packet_template *packet_data = (packet_template *) calloc(1, sizeof(packet_template));
+    packet_template *packet_data = (packet_template *) malloc(sizeof(packet_template));
 
     packet_data->flowset_id = htons(FLOWSET_ID);
     packet_data->length = htons(sizeof(packet_template));
