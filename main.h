@@ -28,9 +28,11 @@
 #include "uthash.h"
 
 #define PACKET_SIZE 65536 //maximum packet size
-#define FLOW_LIST_SIZE 128000 //default amount of possible flow records
+#define FLOW_LIST_SIZE_MAX 128000 //default amount of possible flow records
+#define FLOW_LIST_SIZE 128000 //amount of records for which memory will be allocated on start
+                                //should be <= FLOW_LIST_SIZE_MAX
 
-#define FLOW_EXPIRY_INTERVAL 120000 //milliseconds
+#define FLOW_EXPIRY_INTERVAL 60000 //milliseconds
 #define FLOW_EXPORT_INTERVAL 240 //seconds
 
 #define FLOWSET_EXPORT 1 //1 - flowset is updated every FLOWSET_EXPORT_INTERVAL seconds
@@ -97,8 +99,8 @@ typedef struct flow_data_casing {
 } flow_data_casing;
 flow_data_casing *r = NULL;
 
-flow_data_casing *casings[FLOW_LIST_SIZE];
-int flow_size = FLOW_LIST_SIZE;  //FLOW_LIST_SIZE initialized as variable for further changes
+flow_data_casing *casings[FLOW_LIST_SIZE_MAX];
+int flow_size = FLOW_LIST_SIZE;  //FLOW_LIST_SIZE initialized as variable for further changes if its <= FLOW_LIST_MAX
 
 int cur_el;
 int flow_count;

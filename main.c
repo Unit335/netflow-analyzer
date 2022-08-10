@@ -22,7 +22,7 @@ int main(int argc, char *argv[])
         return 1;
     }
     if ((retcode = pthread_create(&check, NULL, flow_check, NULL)) != 0) {
-        fprintf(stderr, "pthread_create (stat): (%d)%s\n", retcode, strerror(retcode));
+        fprintf(stderr, "pthread_create (check): (%d)%s\n", retcode, strerror(retcode));
         return 1;
     }
 
@@ -70,7 +70,7 @@ void *packet_parser()
     cur_el = 0; //points to current element in list of all flows, including deleted
     flow_count = 0;
 
-    for (int i = 0; i < FLOW_LIST_SIZE; i++) {
+    for (int i = 0; i < flow_size; i++) {
         casings[i] = (flow_data_casing *) malloc(sizeof(flow_data_casing));
         memset(casings[i], 0, sizeof(flow_data_casing));
     }
@@ -79,14 +79,13 @@ void *packet_parser()
     while (run_switch) {
         data_size = recvfrom(sock_raw, buffer, PACKET_SIZE, 0, &saddr,
                              (socklen_t *) &saddr_size);
-
         if (data_size < 0) {
             perror("Recvfrom error: ");
             pthread_exit((void *) 1);
         }
         struct iphdr *iph = (struct iphdr *) (buffer + sizeof(struct ethhdr));
         struct ethhdr *eth = (struct ethhdr *) buffer;
-        if (iph->protocol == 17) { //UDP
+        if ( iph->protocol == 17 ) { //UDP
             unsigned short iphdrlen = iph->ihl * 4;
             struct udphdr *udph = (struct udphdr *) (buffer + iphdrlen + sizeof(struct ethhdr));
             memset(casings[cur_el], 0, sizeof(flow_data_casing));
@@ -107,7 +106,7 @@ void *packet_parser()
             casings[cur_el]->id = iph->id;
             flow_identifier();
         }
-        else if (iph->protocol == 6) { //TCP
+        else if ( iph->protocol == 6 ) { //TCP
             unsigned short iphdrlen = iph->ihl * 4;
             struct tcphdr *tcph = (struct tcphdr *) (buffer + iphdrlen + sizeof(struct ethhdr));
             memset(casings[cur_el], 0, sizeof(flow_data_casing));
@@ -128,7 +127,7 @@ void *packet_parser()
             casings[cur_el]->id = iph->id;
             flow_identifier();
         }
-        else if (iph->protocol == 1) { //ICMP
+        else if ( iph->protocol == 1 ) { //ICMP
             unsigned short iphdrlen = iph->ihl * 4;
             struct icmphdr *icmph = (struct icmphdr *) (buffer + iphdrlen + sizeof(struct ethhdr));
             memset(casings[cur_el], 0, sizeof(flow_data_casing));
@@ -163,7 +162,7 @@ void flow_identifier()
  //   printf("%d\n", flow_count);
     flow_data_casing *p;
     HASH_FIND(hh, r, &(casings[cur_el]->flow_key), sizeof(uniq_flow_data), p);
-    if (p != NULL) {
+    if ( p != NULL ) {
         pthread_mutex_lock(&lock);
         p->last_switch = c_time();
         p->data_size += data_size;
@@ -175,18 +174,22 @@ void flow_identifier()
         casings[cur_el]->last_switch = casings[cur_el]->first_switch;
         casings[cur_el]->last_export = time(NULL);
         casings[cur_el]->packet_counter = 1;
+        casings[cur_el]->data_size = data_size;
 
         HASH_ADD(hh, r, flow_key, sizeof(uniq_flow_data), casings[cur_el]);
-        //memset(&casings[cur_el], 0, sizeof(flow_data_casing));
         ++cur_el;
         ++flow_count;
 
-        if (cur_el >= flow_size) {
+        if ( cur_el >= flow_size ) {
             flow_size += 2;
+            if ( flow_size >= FLOW_LIST_SIZE_MAX ) {
+                fprintf(stderr, "Error: reached maximum amount of records\n");
+                closing_handler();
+                return;
+            }
             casings[cur_el] = (flow_data_casing *) malloc(sizeof(flow_data_casing));
             casings[cur_el + 1] = (flow_data_casing *) malloc(sizeof(flow_data_casing));
         }
-
     }
 }
 
