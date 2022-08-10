@@ -23,10 +23,10 @@
 
 В утилите используется следующий синтакси опций запуска, для работы необходимо указать сетевой интерфейс для работы и адрес + порт коллектора.
 ```
-netflow-analyzer [ --interface INTERFACE-dest DESTINATION_IP --dest_port DESTINATION_PORT ]
-interface: название сетевого интерфейса на котором необходимо отслеживать пакеты
-dest: IP адрес коллектора в формате XXX.XXX.XXX.XXX 
-dest_port: порт коллектора
+netflow-analyzer [ --interface/-i INTERFACE --dest/-d DESTINATION_IP --dest_port/-p DESTINATION_PORT ]
+interface/i: название сетевого интерфейса на котором необходимо отслеживать пакеты
+dest/d: IP адрес коллектора в формате XXX.XXX.XXX.XXX 
+dest_port/p: порт коллектора
 ```
 Остальные параметры работы определены в main.h. 
 
